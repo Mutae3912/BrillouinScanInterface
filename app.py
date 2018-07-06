@@ -70,13 +70,30 @@ class App(threading.Thread):
         self.PlasticBS =  9.6051
         self.WaterBS = 5.1157
 
+
+        self.panelA_frame = tki.Frame(self.root,bg="red",width=1024,height=812)
+        self.panelB_frame = tki.Frame(self.root,bg="blue",width=1024,height=179)
+        self.control_frame = tki.Frame(self.root,width=1024,height=250)
+        self.canvas_frame = tki.Frame(self.root,bg="cyan",width=1024,height=812)
+
+
+        self.panelA_frame.grid(row=0,column=0,rowspan=4,sticky="nw")
+        self.panelB_frame.grid(row=0,column=1,sticky="nw")
+        self.control_frame.grid(row=4,column=0,sticky="n")
+        self.canvas_frame.grid(row=1,column=1,rowspan=4,sticky="nw")
+
+        self.panelA_frame.grid_propagate(False)
+        self.panelB_frame.grid_propagate(False)
+        self.control_frame.grid_propagate(False)
+
+
         # initialize the root window and image panel
         #CMOS camera panel
         self.panelA = None
         #EMCCD camera panel
         self.panelB = None
         #where graphs are drawn
-        self.canvas = FigureCanvasTkAgg(self.graph.fig, master = self.root)
+        self.canvas = FigureCanvasTkAgg(self.graph.fig, master=self.canvas_frame)
 
         # GUI constants
         self.pupil_video_frames = []
@@ -84,9 +101,9 @@ class App(threading.Thread):
         self.andor_image_list = []
         self.scan_ready = False
         self.andor_export_image = None
-        self.click_pos = None
-        self.release_pos = None
         self.expected_pupil_radius = 0
+
+
 
 
         ##########################
@@ -94,13 +111,15 @@ class App(threading.Thread):
         ##########################
 
         #button will take the current frame and save it to file
-        snapshot_btn = tki.Button(self.root, text="Picture", command=self.takeSnapshot)
-        snapshot_btn.grid(row = 3, column = 0, sticky = "w") 
+        snapshot_btn = tki.Button(self.control_frame, text="Picture", command=self.takeSnapshot)
 
         #button to start recording pupil cam and resulting pupil detection data
         self.record = tki.IntVar()
-        record_btn = tki.Checkbutton(self.root, text="Record", variable = self.record, command=self.triggerRecord, indicatoron = 0)
-        record_btn.grid(row=3, column=1, sticky="w")
+        record_btn = tki.Checkbutton(self.control_frame, text="Record", variable = self.record, command=self.triggerRecord, indicatoron = 0)
+        
+        #layout
+        snapshot_btn.grid(row = 0,column = 0, sticky = "w") 
+        record_btn.grid(row = 0, column = 1, sticky = "w")
 
 
         ###################
@@ -109,61 +128,69 @@ class App(threading.Thread):
 
         #reference button, shutter_state also used to determine graph fitting
         self.shutter_state = tki.IntVar()
-        reference_btn = tki.Checkbutton(self.root, text = "Reference", variable = self.shutter_state, command = self.shutters, indicatoron = 0)
-        reference_btn.grid(row = 3, column = 2, sticky = "w") 
+        reference_btn = tki.Checkbutton(self.control_frame, text = "Reference", variable = self.shutter_state, command = self.shutters, indicatoron = 0)
 
         #Shows current FSR on interface
-        FSR_label = tki.Label(self.root, text = "FSR ").grid(row = 3, column = 3, sticky = "e")
+        FSR_label = tki.Label(self.control_frame, text = "FSR ")
         self.FSR = tki.DoubleVar()
         self.FSR.set(16.2566)
-        FSR_entry = tki.Entry(self.root, textvariable = self.FSR)
-        FSR_entry.grid(row = 3, column = 4, sticky = "w")
+        FSR_entry = tki.Entry(self.control_frame, textvariable = self.FSR)
 
         #Shows current SD on interface
-        SD_label = tki.Label(self.root, text = "SD ").grid(row = 3, column = 4, sticky = "e")
+        SD_label = tki.Label(self.control_frame, text = "SD ")
         self.SD = tki.DoubleVar()
         self.SD.set(0.14288)
-        SD_entry = tki.Entry(self.root, textvariable = self.SD)
-        SD_entry.grid(row = 3, column = 5, sticky = "w")
+        SD_entry = tki.Entry(self.control_frame, textvariable = self.SD)
+
+        #layout
+        reference_btn.grid(row = 0, column = 2, sticky = "w") 
+        FSR_label.grid(row = 0, column = 3, sticky = "e")
+        FSR_entry.grid(row = 0, column = 4, sticky = "w")
+        SD_label.grid(row = 0, column = 4, sticky = "e")
+        SD_entry.grid(row = 0, column = 5, sticky = "w")
 
 
         ###################
         ### MOTOR PANEL ###
         ###################
 
-        motor_label = tki.Label(self.root, text = "Motor Control")
-        motor_label.grid(row = 4, column = 0, pady=10, sticky = "sw")
+        motor_label = tki.Label(self.control_frame, text = "Motor Control")
 
         #home button for motor
-        home_btn = tki.Button(self.root, text = "Home", command = lambda: self.move_motor_home())
-        home_btn.grid(row = 5, column = 0, sticky = "nw")
+        home_btn = tki.Button(self.control_frame, text = "Home", command = lambda: self.move_motor_home())
 
    		#entry for user to input distance to move motor forward or backward
         distance_var = tki.IntVar()
         distance_var.set(0)
-        distance_label = tki.Label(self.root, text = "Distance to Move").grid(row = 4, column = 1, sticky = "sw")
-        distance_entry = tki.Entry(self.root, textvariable = distance_var)
-        distance_entry.grid(row = 5, column = 1, sticky = "nw")
+        distance_label = tki.Label(self.control_frame, text = "Distance to Move")
+        distance_entry = tki.Entry(self.control_frame, textvariable = distance_var)
 
         #moves motor forward by given distance from above
-        forward_button = tki.Button(self.root, text = "Forward", command = lambda: self.move_motor_relative(distance_var.get()))
-        forward_button.grid(row = 5, column = 2, sticky = "nw")
+        forward_button = tki.Button(self.control_frame, text = "Forward", command = lambda: self.move_motor_relative(distance_var.get()))
 
         #moves motor backwards by given distance from above
-        back_button = tki.Button(self.root, text = "Backwards", command = lambda: self.move_motor_relative(-distance_var.get()))
-        back_button.grid(row = 5, column = 3, sticky = "nw")
+        back_button = tki.Button(self.control_frame, text = "Backwards", command = lambda: self.move_motor_relative(-distance_var.get()))
 
         #shows current location of motor on rails
         self.location_var = tki.IntVar()
         current_location = self.motor.device.send(60, 0)
         self.location_var.set(int(current_location.data*3.072))
-        location_label = tki.Label(self.root, text = "Position").grid(row = 4, column = 4, sticky = "sw")
-        location_entry = tki.Entry(self.root, textvariable = self.location_var)
-        location_entry.grid(row = 5, column = 4, sticky = "nw")
+        location_label = tki.Label(self.control_frame, text = "Position")
+        location_entry = tki.Entry(self.control_frame, textvariable = self.location_var)
 
         #can enter a different location above and move motor to entered location
-        position_button = tki.Button(self.root, text =  "Move to Position", command = lambda: self.move_motor_abs(self.location_var.get()))
-        position_button.grid(row = 5, column = 5, sticky = "nw")
+        position_button = tki.Button(self.control_frame, text =  "Move to Position", command = lambda: self.move_motor_abs(self.location_var.get()))
+
+        #layout
+        motor_label.grid(row = 1, column = 0, pady=10, sticky = "sw")
+        home_btn.grid(row = 2, column = 0, sticky = "nw")
+        distance_label.grid(row = 1, column = 1, sticky = "sw")
+        distance_entry.grid(row = 2, column = 1, sticky = "nw")
+        forward_button.grid(row = 2, column = 2, sticky = "nw")
+        back_button.grid(row = 2, column = 3, sticky = "nw")        
+        location_label.grid(row = 1, column = 4, sticky = "sw")
+        location_entry.grid(row = 2, column = 4, sticky = "nw")
+        position_button.grid(row = 2, column = 5, sticky = "nw")
 
 
         #############################
@@ -173,27 +200,32 @@ class App(threading.Thread):
         #entry for motor start position
         start_pos = tki.IntVar()
         start_pos.set(0)
-        start_pos_label = tki.Label(self.root, text="Start(um)").grid(row = 6, column = 0)
-        start_pos_entry = tki.Entry(self.root, textvariable = start_pos)
-        start_pos_entry.grid(row = 7, column = 0)
+        start_pos_label = tki.Label(self.control_frame, text="Start(um)")
+        start_pos_entry = tki.Entry(self.control_frame, textvariable = start_pos)
         
         #entry for number of pictures to take during scan
         num_frames = tki.IntVar()
         num_frames.set(0)
-        num_frames_label = tki.Label(self.root, text="#Frames").grid(row = 6, column = 1)
-        num_frames_entry = tki.Entry(self.root, textvariable = num_frames)
-        num_frames_entry.grid(row = 7, column = 1)
+        num_frames_label = tki.Label(self.control_frame, text="#Frames")
+        num_frames_entry = tki.Entry(self.control_frame, textvariable = num_frames)
         
         #entry for how far motor moves in total
         scan_length = tki.IntVar()
         scan_length.set(0)
-        scan_length_label = tki.Label(self.root, text="Length(um)").grid(row = 6, column = 2)
-        scan_length_entry = tki.Entry(self.root, textvariable = scan_length)
-        scan_length_entry.grid(row = 7, column = 2)
+        scan_length_label = tki.Label(self.control_frame, text="Length(um)")
+        scan_length_entry = tki.Entry(self.control_frame, textvariable = scan_length)
 
         #button to start scan
-       	scan_btn = tki.Button(self.root, text="Start Scan", command = lambda: self.slice_routine(start_pos.get(),scan_length.get(),num_frames.get()))
-        scan_btn.grid(row = 7, column = 3)
+       	scan_btn = tki.Button(self.control_frame, text="Start Scan", command = lambda: self.slice_routine(start_pos.get(),scan_length.get(),num_frames.get()))
+        
+        #layout
+        start_pos_label.grid(row = 3, column = 0)
+        start_pos_entry.grid(row = 4, column = 0)
+        num_frames_label.grid(row = 3, column = 1)
+        num_frames_entry.grid(row = 4, column = 1)
+        scan_length_label.grid(row = 3, column = 2)
+        scan_length_entry.grid(row = 4, column = 2)
+        scan_btn.grid(row = 4, column = 3)
 
 
         ##########################################
@@ -203,12 +235,15 @@ class App(threading.Thread):
         #controls to enter and change velocity of motor
         velocity_var = tki.IntVar()
         velocity_var.set(0)
-        velocity_label = tki.Label(self.root, text="Velocity").grid(row = 6, column = 4)
-        velocity_entry = tki.Entry(self.root, textvariable = velocity_var)
-        velocity_entry.grid(row = 7, column = 4)
+        velocity_label = tki.Label(self.control_frame, text="Velocity")
+        velocity_entry = tki.Entry(self.control_frame, textvariable = velocity_var)
 
-        velocity_btn = tki.Button(self.root, text="Change velocity", command = lambda: self.set_velocity(velocity_var.get()))
-        velocity_btn.grid(row = 7, column = 5)
+        velocity_btn = tki.Button(self.control_frame, text="Change velocity", command = lambda: self.set_velocity(velocity_var.get()))
+        
+        #layout
+        velocity_label.grid(row = 3, column = 4)
+        velocity_entry.grid(row = 4, column = 4)        
+        velocity_btn.grid(row = 4, column = 5)
 
 
         #controls to enter and change acceleration of motor
@@ -237,32 +272,32 @@ class App(threading.Thread):
     def update_root(self):
 
         while not self.stopEvent.is_set():
+            #print "queue size",self.queue.qsize()
             try:
                 destination, item = self.queue.get(timeout=0.1)
 
                 if destination == "panelA":
                     if self.panelA is None:
-                        self.panelA = tki.Label(self.root,image=item)
+                        self.panelA = tki.Label(self.panelA_frame,image=item)
                         self.panelA.image = item
                         self.panelA.grid(row = 0, column = 0, columnspan = 6, rowspan = 3) #pack(side="left", padx=10, pady=10)
                     else:
+                        #print "changing panelA"
                         self.panelA.configure(image=item)
                         self.panelA.image = item
 
                 elif destination == "panelB":
                     if self.panelB is None:
-                        self.panelB = tki.Label(self.root,image=item)
-                        self.panelB.grid_propagate(0)
+                        self.panelB = tki.Label(self.panelB_frame,image=item)
                         self.panelB.image = item
                         self.panelB.grid(row = 0, column = 6, columnspan = 3, sticky = "n") #pack(side="left", padx=10, pady=10)
-
-                        self.panelB.configure(bg="red")
                     else:
+                        #print "changing panelB"
                         self.panelB.configure(image=item)
-                        self.panelB.grid_propagate(0)
                         self.panelB.image = item
                 
                 elif destination == "scatter":
+                    #print "changing canvas panel"
                     self.graph.fig.clf()
                     subplot = self.graph.fig.add_subplot(211)
                     subplot.set_xlabel("Pixel")
@@ -275,16 +310,17 @@ class App(threading.Thread):
                     brillouin_plot.scatter(np.arange(1, len(brillouin_shift_list)+1), np.array(brillouin_shift_list))
 
                     self.canvas.show()
-                    self.canvas.get_tk_widget().grid(row = 1, column = 6, columnspan = 3, rowspan = 6)    #pack(side = "right")
+                    self.canvas.get_tk_widget().grid(row = 0, column = 0, rowspan = 3)    #pack(side = "right")
                 
                 #elif destination == "plot":
                 #    popt = item
                 #    subplot.plot(self.graph.x_axis, lorentzian(self.graph.x_axis, *popt), 'r-', label='fit')
 
-            except:
-                #print "break"
+            except Exception as e:            
+                #print "Error is: ",str(e)
+                #print "Stack trace: ", traceback.format_exc()
                 break
-        self.root.after(300,self.update_root)
+        self.root.after(100,self.update_root)
 
 
     #Loop for thread for CMOS camera - almost exact same as mako_pupil.py
@@ -307,11 +343,7 @@ class App(threading.Thread):
             
             image = cv2.cvtColor(image, cv2.COLOR_GRAY2BGR)
 
-            if self.click_pos is not None and self.release_pos is not None:
-                expected_pupil_radius = int(math.sqrt((self.click_pos[0] - self.release_pos[0])**2 + (self.click_pos[1] - self.release_pos[1])**2)/2)
-                pupil_data = ht.detect_pupil_frame(image,expected_pupil_radius,15)
-            else:
-                pupil_data = ht.detect_pupil_frame(image)
+            pupil_data = ht.detect_pupil_frame(image)
 
 
             if self.record.get() == 1:
@@ -328,7 +360,8 @@ class App(threading.Thread):
             image = imutils.resize(image, width=1024)
             image = Image.fromarray(image)
             image = ImageTk.PhotoImage(image)
-    	
+    	   
+            #print "panelA",image.width(),image.height()
             self.queue.put(("panelA",image))
 
 
@@ -380,8 +413,10 @@ class App(threading.Thread):
 
 
             cropped = scaled_8bit[loc-7:loc+7, mid-40:mid+40]
-            self.graphLoop()
-            print(cropped.shape,loc)
+            
+            #self.graphLoop()
+            
+            #print(cropped.shape,loc)
             (h, w)= cropped.shape[:2]
             if w <= 0 or h <= 0:
                 continue
@@ -394,6 +429,7 @@ class App(threading.Thread):
 
             image = ImageTk.PhotoImage(image)
 
+            #print "panelB",image.width(),image.height()
 
             self.queue.put(("panelB",image))
 
@@ -598,16 +634,6 @@ class App(threading.Thread):
                 self.pupil_data_list = []
 
 
-    def onClick(self,event):
-        self.click_pos = (event.x,event.y)
-        self.release_pos = None
-        print self.click_pos
-
-    def onRelease(self,event):
-        self.release_pos = (event.x,event.y)
-        print self.release_pos
-
-
     # what happens when you exit out of application window
     # release connections to devices, closes application
     def onClose(self):
@@ -626,7 +652,7 @@ class App(threading.Thread):
 
 class Graph(object):
     def __init__(self):
-        self.fig = Figure(figsize = (10, 10), dpi = 100)
+        self.fig = Figure(figsize = (8, 8), dpi = 100)
         self.x_axis = np.arange(1,81)
 
 def lorentzian(x, gamma_1, x0_1, constant_1, gamma_2, x0_2, constant_2, constant_3):

@@ -53,7 +53,7 @@ def objective_function(center,radius,expected_center,expected_radius):
     return center_diff + 5*radius_diff
 
         
-def detect_pupil_frame(frame,expected_radius=180,radius_range=15):
+def detect_pupil_frame(frame,expected_radius=110,radius_range=30):
 
     if frame is None: 
         return
@@ -62,7 +62,7 @@ def detect_pupil_frame(frame,expected_radius=180,radius_range=15):
 
     frame = cv2.cvtColor(frame_bgr, cv2.COLOR_BGR2GRAY)
 
-    frame = cv2.medianBlur(frame,15) #required for Hough transform
+    frame = cv2.medianBlur(frame,25) #required for Hough transform
 
     """
     ## Parameters for cv2.HoughCircles() ##
@@ -75,7 +75,7 @@ def detect_pupil_frame(frame,expected_radius=180,radius_range=15):
     minRadius: Minimum size of the radius (in pixels).
     maxRadius: Maximum size of the radius (in pixels).
     """
-    circles = cv2.HoughCircles(frame,cv2.HOUGH_GRADIENT,dp=3,minDist=max(frame.shape[:2]),param1=1,param2=700,minRadius=expected_radius-radius_range,maxRadius=expected_radius+radius_range)
+    circles = cv2.HoughCircles(frame,cv2.HOUGH_GRADIENT,dp=3,minDist=max(frame.shape[:2]),param1=1,param2=500,minRadius=expected_radius-radius_range,maxRadius=expected_radius+radius_range)
 
     min_objective = float('inf')
     min_circle_center = None
@@ -106,8 +106,8 @@ def detect_pupil_frame(frame,expected_radius=180,radius_range=15):
         #print "No circles detected!"
 
 
-    #cv2.line(frame_bgr,(0,0),(0,15),(0,0,0),5) # vertical line
-    #cv2.line(frame_bgr,(0,0),(100,0),(255,255,255),5) # horizontal line
+    cv2.line(frame_bgr,(0,0),(0,15),(0,0,0),5) # vertical line
+    cv2.line(frame_bgr,(0,0),(100,0),(255,255,255),5) # horizontal line
 
     return (frame_bgr.copy(),min_circle_center,min_circle_radius)
 
