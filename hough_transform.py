@@ -73,6 +73,7 @@ def detect_pupil_frame(frame,medianBlur,dp,minDist,param1,param2,radius_range,ex
     dim = frame.shape
     frame_bgr = frame.copy()
 
+    # crops frame according to crop_size and feeds that into HoughCircles
     if ROI_center is not None:
         crop_size = croppingSize
         min_y, max_y, min_x, max_x = max(0,ROI_center[1]-crop_size), min(dim[0],ROI_center[1]+crop_size), max(0,ROI_center[0]-crop_size), min(dim[1],ROI_center[0]+crop_size)
@@ -96,7 +97,7 @@ def detect_pupil_frame(frame,medianBlur,dp,minDist,param1,param2,radius_range,ex
         circles = np.uint16(np.around(circles))
 
         for i in circles[0,:]:
-            #also show other detected circles
+            # used to show other detected circles 
             #cv2.circle(frame_bgr,(i[0],i[1]),i[2],(0,0,255),1)
             #cv2.circle(frame_bgr,(i[0],i[1]),2,(0,0,255),2)
 
@@ -120,13 +121,12 @@ def detect_pupil_frame(frame,medianBlur,dp,minDist,param1,param2,radius_range,ex
 
     else:
         pass 
-        #print "No circles detected!"
 
-    #control 
-    cv2.line(cropped_frame,(0,0),(0,cropped_frame.shape[0]),(0,0,255),1) # vertical line
-    cv2.line(cropped_frame,(cropped_frame.shape[1]-1,0),(cropped_frame.shape[1]-1,cropped_frame.shape[0]-1),(0,0,255),1)
-    cv2.line(cropped_frame,(0,0),(cropped_frame.shape[1],0),(0,0,255),1) # horizontal line
-    cv2.line(cropped_frame,(0,cropped_frame.shape[0]-1),(cropped_frame.shape[1]-1,cropped_frame.shape[0]-1),(0,0,255),1)
+    # used for debugging
+    #cv2.line(cropped_frame,(0,0),(0,cropped_frame.shape[0]),(0,0,255),1) # vertical line
+    #cv2.line(cropped_frame,(cropped_frame.shape[1]-1,0),(cropped_frame.shape[1]-1,cropped_frame.shape[0]-1),(0,0,255),1)
+    #cv2.line(cropped_frame,(0,0),(cropped_frame.shape[1],0),(0,0,255),1) # horizontal line
+    #cv2.line(cropped_frame,(0,cropped_frame.shape[0]-1),(cropped_frame.shape[1]-1,cropped_frame.shape[0]-1),(0,0,255),1)
 
     if ROI_center is not None and min_circle_center is not None:
         min_circle_center = (min_circle_center[0]+min_x,min_circle_center[1]+min_y)

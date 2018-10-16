@@ -16,13 +16,17 @@ import hough_transform as ht
 import skvideo.io as skv
 
 # device imports
-
 import device_init
 from pymba import *
 from my_andor.andor_wrap import *
 from ctypes import *
 import zaber.serial as zs
 
+"""
+This class defines the popup window that appears when user clicks the "Draw Radius Estimate" button.
+Lets user drag with across the pupil in the image to give a radius estimate. Popup records location when user
+initiates the click and when they release and calculate the distance between these points when they press Done
+"""
 class Popup(QtGui.QWidget):
 
     def __init__(self,CMOSthread):
@@ -82,7 +86,6 @@ class CMOSthread(QtCore.QThread):
         self.coord_panel_image = None
         self.update_coord_panel() #initializes coord panel image
 
-
         self.crosshair_size = 20
         self.pupil_video_frames = []
         self.pupil_data_list = []
@@ -125,6 +128,13 @@ class CMOSthread(QtCore.QThread):
     def set_coordinates(self):
         self.coords = not self.coords
 
+    def ask_radius_estimate(self):
+        self.popup = Popup(self)
+
+    """
+    Called when "Apply Changes" in the pupil detection panel is clicked. Sets all the values that the pupil detection
+    will use next
+    """
     def apply_parameters(self):
         self.medianBlur = int(self.app.blur_entry.displayText())
         self.dp = float(self.app.dp_entry.displayText())
@@ -136,9 +146,11 @@ class CMOSthread(QtCore.QThread):
         self.croppingSize = int(self.app.croppingSize_entry.displayText())
         self.scan_loc = (int(self.app.scan_location_x_entry.displayText()),int(self.app.scan_location_y_entry.displayText()))
 
-    def ask_radius_estimate(self):
-        self.popup = Popup(self)
 
+    """
+    Starts recording frames from the pupil camera and also writing the detected pupil's center and radius 
+    in a separate text file
+    """
     def trigger_record(self):
         if not self.app.record_btn.isChecked():
 
@@ -178,6 +190,12 @@ class CMOSthread(QtCore.QThread):
             pupil_data_file.close()
             self.pupil_data_list = []
 
+    """ 
+    Runs the pupil camera loop. At a high level, it takes the next from the pupil camera, runs pupil detection,
+    generates the coordinate panel image, then sends the image to be displayed on the pupil camera panel and the 
+    coordinate panel and exports these to the main App
+
+    """
     def run(self):
         self.mako.camera.startCapture()
         self.mako.camera.runFeatureCommand('AcquisitionStart')

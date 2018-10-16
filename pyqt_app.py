@@ -50,8 +50,8 @@ class App(QtGui.QMainWindow,qt_ui.Ui_MainWindow):
         self.save_path = self.file_entry.displayText()
         self.session_name = self.session_entry.displayText()
 
-        #Lock used to halt other threads upon app closing
-        self.stop_event = threading.Event()
+        # following locks are used throughout the program to deal with synchronization issues
+        self.stop_event = threading.Event() #Lock used to halt other threads upon app closing
         self.andor_lock = threading.Lock()
         self.scan_lock = threading.Lock()
         self.map_lock = threading.Lock()
@@ -99,8 +99,6 @@ class App(QtGui.QMainWindow,qt_ui.Ui_MainWindow):
 
         self.EMCCDthread = EMCCDthread.EMCCDthread(self)
         self.connect(self.EMCCDthread,QtCore.SIGNAL('update_EMCCD_panel(PyQt_PyObject)'),self.update_EMCCD_panel)
-        print "return value 1: ",self.connect(self.EMCCDthread,QtCore.SIGNAL('update_graph_panel(PyQt_PyObject)'),self.update_graph_panel)
-        print "return value 2: ",self.connect(self.EMCCDthread,QtCore.SIGNAL('draw_curve(PyQt_PyObject)'),self.draw_curve)
         self.connect(self.EMCCDthread,QtCore.SIGNAL('update_heatmap_panel(PyQt_PyObject)'),self.update_heatmap_panel)
 
         ### CMOS AND EMCCD PANEL ###
@@ -109,15 +107,20 @@ class App(QtGui.QMainWindow,qt_ui.Ui_MainWindow):
 
         self.avg_heatmap.plot()
         self.heatmap_panel.initialize_canvas(self.avg_heatmap.fig)
-
-
         self.heatmap_panel.canvas.draw()
         self.heatmap_panel.show()
+
         self.mainUI()
 
         self.CMOSthread.start()
         self.EMCCDthread.start()
 
+    """
+    This connects all widgets that are initialized in qt_ui.py (made through QtDesigner)
+    to the functions that they invoke. For ex. when self.screenshot_btn is clicked on the 
+    UI, then it will call the self.take_screenshot function. Organized by the different panels
+    that the widgets are part of.
+    """
     def mainUI(self):
 
         self.session_entry.textChanged.connect(self.session_change)
@@ -190,11 +193,43 @@ class App(QtGui.QMainWindow,qt_ui.Ui_MainWindow):
         self.get_temp_entry.setText(str(self.andor.cam.temperature))
         self.emccd_apply_btn.clicked.connect(self.apply_emccd_changes)
 
-        print "finished showing"
 
+    #########################
+    ### SESSION FUNCTIONS ###
+    #########################
+
+    """
+    Saves user specified session name
+    """
+    def session_change(self,name):
+        self.session_name = name
+
+    """
+    Opens up a file dialog window to let user select their save path.
+    """
+    def select_file(self):
+        self.save_path = str(QtGui.QFileDialog.getExistingDirectory(self, "Select Directory"))
+        if self.save_path != "":
+            self.file_entry.setText(self.save_path)
+
+
+    ##############################
+    ### PANEL UPDATE FUNCTIONS ###
+    ##############################
+
+    """
+    Main function that updates the pupil camera panel and the coordinate panel. Takes images as parameter
+    and sets them onto the panel using setPixmap function. Also updates the pupil_center_entry and 
+    pupil_radius_entry with the detected center and radius values. 
+
+    camera_data: tuple of the following values: 
+                panel_pixmap - QPixmap next pixmap image to display on the pupil camera panel
+                coord_pixmap - QPixmap next pixmap image to display on the coordinate panel
+                detected_center - tuple (x,y) center of the detected pupil 
+                detected_radius - int radius of the detected pupil
+    """
     def update_CMOS_panel(self,camera_data):
         #print "updating CMOS panel"
-        #updating cmos panel
         panel_pixmap, coord_pixmap, detected_center, detected_radius = camera_data
 
         self.cmos_panel.setPixmap(panel_pixmap)
@@ -209,13 +244,20 @@ class App(QtGui.QMainWindow,qt_ui.Ui_MainWindow):
         self.pupil_center_entry.setText(str(self.detected_center))
         self.pupil_radius_entry.setText(str(self.detected_radius))
 
-
+    """
+    Main function that updates the EMCCD panel. Takes a qImage as input and displays it
+    using setPixmap.
+    qImage: QImage next image that will be displayed on the EMCCD panel
+    """
     def update_EMCCD_panel(self,qImage):
         #print "updating EMCCD panel"
         pixmap = QtGui.QPixmap.fromImage(qImage)
         self.emccd_panel.setPixmap(pixmap)
         self.emccd_panel.show()
 
+    """
+    Updates heatmap panel by re-plotting the heatmap
+    """
     def update_heatmap_panel(self,BS_data=None):
         
         if BS_data is not None:
@@ -225,6 +267,9 @@ class App(QtGui.QMainWindow,qt_ui.Ui_MainWindow):
         self.avg_heatmap.plot()
         self.heatmap_panel.canvas.draw()
 
+    """
+    Updates graph panel (scatter plot, and the Brillouin plot) only by plotting points
+    """
     def update_graph_panel(self,graph_data):
 
         copied_analyzed_row, brillouin_shift_list = graph_data
@@ -268,14 +313,15 @@ class App(QtGui.QMainWindow,qt_ui.Ui_MainWindow):
             self.scatter_brillouin_plot.set_offsets(brillouin_scatter_array)
         """
 
-
+    """
+    Updates the first graph by drawing a curve according to whether the EMCCD is on the reference or not 
+    """
     def draw_curve(self,curve_data):
-        print "curve_data: ", curve_data
-        if len(curve_data) == 2:
+        if len(curve_data) == 2: # NOTE: these numbers do NOT refer to the number of peaks, only to the size of the curve_data tuple
             popt, pcov = curve_data
             self.subplot.plot(self.graph.x_axis, EMCCDthread.lorentzian(self.graph.x_axis, *popt), 'r-', label='fit')
-        elif len(curve_data) == 4:
-            print "hello???"
+
+        elif len(curve_data) == 4: # curve_data has to contain the new SD and FSR values which is why we check if its length is 4
             popt, pcov, measured_SD, measured_FSR = curve_data
             self.subplot.plot(self.graph.x_axis, EMCCDthread.lorentzian_reference(self.graph.x_axis, *popt), 'r-', label='fit')
             self.SD_entry.setText(measured_SD)
@@ -283,42 +329,47 @@ class App(QtGui.QMainWindow,qt_ui.Ui_MainWindow):
 
         self.graph_panel.canvas.draw()
 
-    def session_change(self,name):
-        self.session_name = name
 
-    def take_screenshot(self):
+    #######################################
+    ### PUPIL DETECTION PANEL FUNCTIONS ###
+    #######################################
 
-        p = QtGui.QPixmap.grabWindow(self.winId())
+    """
+    Called when the "Restore Default" button is clicked. Resets initial values for
+    each of the pupil detection parameters to whatever was hardcoded within this function.
+    """
+    def restore_default_params(self):
+        self.dp_entry.setText("3.0")
+        self.minDist_entry.setText("1000")
+        self.param1_entry.setText("1")
+        self.param2_entry.setText("15")
+        self.range_entry.setText("15")
+        self.radius_entry.setText("100")
+        self.croppingSize_entry.setText("300")
 
-        ts = datetime.datetime.now()
-        timestr = "{}".format(ts.strftime("%m-%d-%H-%M-%S"))
-
-        p.save(self.save_path+"/"+self.session_name+"_"+timestr+"_screenshot.jpg", 'jpg')
-        print "shot taken"
-
-    def handle_click(self,event):
-        
-        if self.set_scan_loc_btn.isChecked():
-            x = event.pos().x()
-            y = event.pos().y()
-            self.CMOSthread.scan_loc = (x,y)
-            self.scan_location_x_entry.setText(str(x))
-            self.scan_location_y_entry.setText(str(y))
-            self.set_scan_loc_btn.setChecked(False)
+    def set_radius_entry(self,expected_pupil_radius):
+        self.radius_entry.setText(str(expected_pupil_radius))
 
 
-    def convert_to_pixmap(self,image):
-        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
-        height, width, channel = image.shape
-        bytesPerLine = 3 * width
-        qimage = QtGui.QImage(image.data, width, height, bytesPerLine, QtGui.QImage.Format_RGB888) 
-        return QtGui.QPixmap.fromImage(qimage)
+    ############################
+    ### SCAN TABLE FUNCTIONS ###
+    ############################
 
+    """
+    Invoked whenever a scan takes place. Returns an integer that serves as that scan's
+    unique ID number. Number is arbitrarily initialized to 10000 (in __init__()) and increments by 1
+    everytime it is called. 
+    """
     def get_current_ID(self):
         return_id = self.current_ID
         self.current_ID += 1
         return return_id
 
+    """
+    Accesses rows in the scan table that are selected and deletes them from the table.
+    Also will update the coordinate panel and the heatmap panel so that they accurately reflect
+    the removal of the selected scans. 
+    """
     def delete_entries(self):
         selected_items = self.scanned_loc_table.selectedItems()
         selected_row_set = set(map(lambda item: item.row(),selected_items))
@@ -346,6 +397,10 @@ class App(QtGui.QMainWindow,qt_ui.Ui_MainWindow):
             self.scanned_loc_table.removeRow(row)
 
 
+    """
+    Clears the scan table of all its entries. Also updates coordinate and heatmap panels to 
+    show removal of all scans in the table.
+    """
     def clear_table(self):
         self.scanned_loc_table.clearContents()
         self.scanned_loc_table.setRowCount(1)
@@ -361,13 +416,14 @@ class App(QtGui.QMainWindow,qt_ui.Ui_MainWindow):
         self.coord_panel.show()
         self.heatmap_panel.canvas.draw()
 
-    def select_file(self):
-        self.save_path = str(QtGui.QFileDialog.getExistingDirectory(self, "Select Directory"))
-        if self.save_path != "":
-            self.file_entry.setText(self.save_path)
 
-    def export_scans(self):
-        
+    """
+    Called when user clicks "Export Scans" button. Takes all scanned points currently in the table 
+    and exports them as an hdf5 file. Specifically, it saves the Brillouin profiles which are the arrays
+    of average Brillouin frequency shift sorted by depth, and the spectrographs which are slices of the image
+    displayed on the EMCCD panel that have the highest brightness
+    """
+    def export_scans(self): 
 
         selected_items = self.scanned_loc_table.selectedItems()
         selected_row_set = set(map(lambda item: item.row(),selected_items))
@@ -404,6 +460,9 @@ class App(QtGui.QMainWindow,qt_ui.Ui_MainWindow):
                 #spectrograph_dataset.attrs.create('IMAGE_SUBCLASS','IMAGE_GRAYSCALE',dtype=str)
 
 
+    #########################
+    ### SHUTTER FUNCTIONS ###
+    #########################
 
     #similar to shutters.py, called on by reference button 
     def shutters(self, close = False):
@@ -425,6 +484,11 @@ class App(QtGui.QMainWindow,qt_ui.Ui_MainWindow):
         dll.piDisconnectShutter(usb312)
         dll.piDisconnectShutter(usb314)
 
+
+    #############################
+    ### MOTOR PANEL FUNCTIONS ###
+    #############################
+
     # moves zaber motor to home position
     def move_motor_home(self):
         self.motor.device.home()
@@ -437,14 +501,17 @@ class App(QtGui.QMainWindow,qt_ui.Ui_MainWindow):
         loc = self.motor.device.send(60, 0)
         self.location_entry.setText(str(loc.data*0.047625))
 
-     # moves zaber motor to a set location, called on above
+    # moves zaber motor to a set location, called on above
     def move_motor_abs(self,pos):
         self.motor.device.move_abs(pos/0.047625)
         loc = self.motor.device.send(60, 0)
         self.location_entry.setText(str(loc.data*0.047625))
 
+    """
+    Takes whatever values are in the velocity and acceleration entries and changes
+    settings on the camera to apply those values to it.
+    """
     def apply_changes(self):
-
         velocity = self.velocity_entry.displayText()
         acceleration = self.acceleration_entry.displayText()
 
@@ -456,6 +523,13 @@ class App(QtGui.QMainWindow,qt_ui.Ui_MainWindow):
             self.motor.device.send(42,velocity_data)
 
 
+    #############################
+    ### EMCCD PANEL FUNCTIONS ###
+    #############################
+
+    """
+    Takes values from entries in the EMCCD panel and applies them to the camera
+    """
     def apply_emccd_changes(self):
         temp = int(self.set_temp_entry.displayText())
         self.andor.cam.SetTemperature(temp)
@@ -464,17 +538,52 @@ class App(QtGui.QMainWindow,qt_ui.Ui_MainWindow):
         exp = float(self.exposure_time_entry.displayText())
         self.andor.cam.SetExposureTime(exp)
 
-    def restore_default_params(self):
-        self.dp_entry.setText("3.0")
-        self.minDist_entry.setText("1000")
-        self.param1_entry.setText("1")
-        self.param2_entry.setText("15")
-        self.range_entry.setText("15")
-        self.radius_entry.setText("100")
-        self.croppingSize_entry.setText("300")
 
-    def set_radius_entry(self,expected_pupil_radius):
-        self.radius_entry.setText(str(expected_pupil_radius))
+    ######################
+    ### MISC FUNCTIONS ###
+    ######################
+
+    """
+    Called when user clicks on the Take Screenshot button. Takes screenshot
+    of GUI and saves it in folder specified by the user specified save_path, session_name,
+    and the current time. 
+    """
+    def take_screenshot(self):
+
+        p = QtGui.QPixmap.grabWindow(self.winId())
+
+        ts = datetime.datetime.now()
+        timestr = "{}".format(ts.strftime("%m-%d-%H-%M-%S"))
+
+        p.save(self.save_path+"/"+self.session_name+"_"+timestr+"_screenshot.jpg", 'jpg')
+        print "shot taken"
+
+    """
+    Invoked after user clicks the "Set Scan Location" button. Records location of click
+    on the pupil camera panel. Uses this to locate where on the pupil camera image the scan
+    takes place (where the green crosshair is).
+    """
+    def handle_click(self,event):
+        
+        if self.set_scan_loc_btn.isChecked():
+            x = event.pos().x()
+            y = event.pos().y()
+            self.CMOSthread.scan_loc = (x,y)
+            self.scan_location_x_entry.setText(str(x))
+            self.scan_location_y_entry.setText(str(y))
+            self.set_scan_loc_btn.setChecked(False)
+
+    """
+    Takes image of numpy array type and converts it into a 
+    QPixmap object
+    """
+    def convert_to_pixmap(self,image):
+        image = cv2.cvtColor(image, cv2.COLOR_BGR2RGB)
+        height, width, channel = image.shape
+        bytesPerLine = 3 * width
+        qimage = QtGui.QImage(image.data, width, height, bytesPerLine, QtGui.QImage.Format_RGB888) 
+        return QtGui.QPixmap.fromImage(qimage)
+
 
     def closeEvent(self,event):
         self.stop_event.set()

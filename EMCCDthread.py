@@ -66,6 +66,10 @@ class EMCCDthread(QtCore.QThread):
     def get_plastic_BS(self,T):
         return 16.3291 - (-0.0005512*T**2 + 0.04333*T + 6.019)
 
+    """
+    This function is only used as a subfunction in scan(), returns the next frame from the EMCCD camera
+    and the calculated Brillouin shift value from that frame
+    """
     def acquire_frame(self):
         with self.andor_lock:
             self.andor.cam.StartAcquisition() 
@@ -109,6 +113,7 @@ class EMCCDthread(QtCore.QThread):
 
         return image, BS
 
+
     def update_scanned_location(self, relative_coord, BS_profile, image_list, start_pos, length, num_steps):
 
         if self.app.CMOSthread.scan_loc is not None:
@@ -132,6 +137,11 @@ class EMCCDthread(QtCore.QThread):
             
             self.app.CMOSthread.update_coord_panel() #update coord panel
 
+    """
+    Systematically calls acquire_frame() to get the next frame and BS value, then moves the motor, 
+    then calls acquire_frame(), then moves the motor etc.. At the end, exports the all the frames and BS 
+    values collected throughout the scan.
+    """
     def scan(self, start_pos, length, num_steps):
 
         ############
@@ -187,7 +197,10 @@ class EMCCDthread(QtCore.QThread):
             item.setIcon(icon)
             self.app.spectrograph.addItem(item)
 
-
+    """
+    Just like CMOSthread, this runs the EMCCDloop which involves acquiring frames from the EMCCD camera
+    and also running graphloop (below)
+    """
     def run(self):
         while not self.stop_event.is_set():
             with self.andor_lock:
@@ -242,8 +255,11 @@ class EMCCDthread(QtCore.QThread):
 
             self.emit(QtCore.SIGNAL('update_EMCCD_panel(PyQt_PyObject)'),qImage)
 
-    #plots graphs, similar to how graphs are plotted on andoru_test.py
-    #uses figure so both plots can be shown at same time
+
+    """
+    Takes frame taken from EMCCD camera and collects points that it will eventually plot to the scatterplot
+    and the Brillouin plot. 
+    """
     def graphLoop(self):
 
         copied_analyzed_row = np.array(self.analyzed_row)
@@ -402,7 +418,6 @@ class HeatMapGraph:
         self.ax.set_xlabel('x (pixels)')
         self.ax.set_ylabel('y (pixels)')
         self.ax.set_aspect('equal')
-
 
 
     def set_resolution(self,resolution,min_x,max_x,min_y,max_y):
